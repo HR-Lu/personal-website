@@ -1,20 +1,19 @@
-/* 紫微命门 · 果冻按钮 v2（整体刚体弹簧）
-   按钮整体被一根「橡皮筋」拴在原位：
-   - 鼠标在按钮上移动 → 黏滞拖拽，按钮整体顺着鼠标方向偏离原位
-   - 偏移到达临界值（绳长）→ 脱扣：被弹簧猛拉回原位，欠阻尼晃动几下
-   - 鼠标离开 → 弹回原位 + 晃动；静止后 rAF 停表，零持续开销
+/* 紫微命门 · 果冻按钮 v3（整体弹簧 · 松绑）
+   按钮整体被一根「松橡皮筋」拴在原位：
+   - 鼠标在按钮里 → 整体朝光标方向倾（目标 = 光标相对按钮中心 × 黏滞系数，带上限）
+   - 光标回到按钮中心 → 方块也回到原位（对称、可预期）
+   - 鼠标离开按钮 → 松手，弹簧拉回原位，欠阻尼晃几下
+   - 静止后 rAF 停表，零持续开销
    外层按钮 = 静态命中区；内层 .zw-jelly-body = 视觉整体（transform 位移） */
 (function (global) {
   'use strict';
 
   const P = {
-    stick: 0.32,      // 鼠标位移 → 拖拽目标转化系数（黏滞）
-    leash: 26,        // 临界偏移 px（绳长，超过即脱扣弹回）
-    slipKick: 300,    // 脱扣瞬间朝家方向的冲量 px/s
-    reEngageMs: 350,  // 脱扣后冷却：这段时间内不再累计拖拽（让弹回晃完）
-    omega: 17,        // 固有角频率 rad/s ≈ 2.7Hz（回弹速度）
-    zetaDrag: 0.5,    // 拖拽跟随阻尼比（顺滑不甩）
-    zetaFree: 0.18,   // 脱扣/离手阻尼比（Q 弹晃 3~4 个来回）
+    stick: 0.30,      // 光标相对位置 → 倾斜目标系数（黏滞）
+    maxDrag: 26,      // 悬停期间最大偏移 px（松橡皮筋的长度）
+    omega: 17,         // 固有角频率 rad/s ≈ 2.7Hz（回弹速度）
+    zetaDrag: 0.55,   // 跟随阻尼比（顺滑贴着目标，几乎不过冲）
+    zetaFree: 0.16,   // 松手回弹阻尼比（Q 弹晃 3~5 个来回）
     settle: 0.4,      // 静止判定（偏移 px + 速度折算）
     vmax: 2400,       // 速度上限 px/s（安全墙）
   };
@@ -33,41 +32,34 @@
       x += vx * dt;
       y += vy * dt;
     }
-    function kick(ix, iy) { vx = ix; vy = iy; }
-    function settleMag() { return Math.hypot(x, y) + Math.hypot(vx, vy) * 0.02; }
-    return { step, kick, pos: () => ({ x, y }), settleMag };
+    /* 相对目标的静止量：悬停停在倾斜位也算静止（rAF 可停表，新交互会重启） */
+    function restMag(tx, ty) { return Math.hypot(x - tx, y - ty) + Math.hypot(vx, vy) * 0.02; }
+    return { step, pos: () => ({ x, y }), restMag };
   }
 
-  /* 控制器：拖拽累计 + 绳长脱扣 + 冷却（纯逻辑，可测） */
-  function createController(now) {
+  /* 控制器：目标 = 光标相对按钮中心的位置 × stick（纯逻辑，可测） */
+  function createController() {
     const sim = createBody();
-    let dragX = 0, dragY = 0;
     let hovering = false;
-    let slipUntil = -1e9;
-    let slipCount = 0;
+    let tx = 0, ty = 0;
 
-    const engaged = () => hovering && now() >= slipUntil;
-
-    function move(dx, dy) {
-      if (!engaged()) return;
-      dragX += dx * P.stick;
-      dragY += dy * P.stick;
-      const d = Math.hypot(dragX, dragY);
-      if (d >= P.leash) {                    // 拉到绳长：脱扣弹回
-        const ux = dragX / d, uy = dragY / d;
-        dragX = 0; dragY = 0;
-        slipUntil = now() + P.reEngageMs;
-        sim.kick(-ux * P.slipKick, -uy * P.slipKick);
-        slipCount++;
+    function aim(cx, cy, hx, hy) {
+      if (!hovering) return;
+      tx = (cx - hx) * P.stick;
+      ty = (cy - hy) * P.stick;
+      const d = Math.hypot(tx, ty);
+      if (d > P.maxDrag) {              // 松橡皮筋有长度上限
+        tx *= P.maxDrag / d;
+        ty *= P.maxDrag / d;
       }
     }
-    function enter() { hovering = true; }
-    function leave() { hovering = false; dragX = 0; dragY = 0; }
+    function enter() { hovering = true; tx = 0; ty = 0; }
+    function leave() { hovering = false; tx = 0; ty = 0; }
     function tick(dt) {
-      const on = engaged();
-      sim.step(dt, on ? dragX : 0, on ? dragY : 0, on ? P.zetaDrag : P.zetaFree);
+      sim.step(dt, tx, ty, hovering ? P.zetaDrag : P.zetaFree);
     }
-    return { sim, move, enter, leave, tick, slips: () => slipCount };
+    function settled() { return sim.restMag(tx, ty) < P.settle; }
+    return { sim, enter, aim, leave, tick, settled };
   }
 
   function init() {
@@ -77,8 +69,7 @@
     const body = btn.querySelector('.zw-jelly-body');
     if (!body) return;
 
-    const ctrl = createController(() => performance.now());
-    let lastX = 0, lastY = 0, hasLast = false;
+    const ctrl = createController();
     let raf = 0, last = 0, running = false;
 
     function render() {
@@ -91,9 +82,8 @@
       last = now;
       ctrl.tick(dt);
       render();
-      if (ctrl.sim.settleMag() < P.settle) {
-        body.style.transform = '';
-        running = false;
+      if (ctrl.settled()) {
+        running = false;        /* 保留最后渲染的 transform（可能停在倾斜稳态） */
         return;
       }
       raf = requestAnimationFrame(loop);
@@ -105,19 +95,22 @@
       raf = requestAnimationFrame(loop);
     }
 
+    const center = () => {
+      const r = btn.getBoundingClientRect();
+      return [r.left + r.width / 2, r.top + r.height / 2];
+    };
+
     btn.addEventListener('pointerenter', e => {
       if (e.pointerType !== 'mouse') return;   // 触屏走原生点击，不抢滚动
-      lastX = e.clientX; lastY = e.clientY; hasLast = true;
       ctrl.enter();
       start();
     });
     btn.addEventListener('pointermove', e => {
-      if (e.pointerType !== 'mouse' || !hasLast) return;
-      ctrl.move(e.clientX - lastX, e.clientY - lastY);
-      lastX = e.clientX; lastY = e.clientY;
+      if (e.pointerType !== 'mouse') return;
+      ctrl.aim(e.clientX, e.clientY, ...center());
       start();
     });
-    const leave = () => { ctrl.leave(); hasLast = false; start(); };
+    const leave = () => { ctrl.leave(); start(); };
     btn.addEventListener('pointerleave', leave);
     window.addEventListener('blur', leave);
     document.addEventListener('visibilitychange', () => {
