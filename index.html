@@ -89,61 +89,44 @@
   }
 
   /* ---------- 紫微命门入口（首页文字下方 · 果冻按钮） ---------- */
+  /* 外层 = 静态命中区；内层 .zw-jelly-body = 视觉整体，被弹簧拴在原位可拖拽 */
   .zw-entry {
     pointer-events: auto;
     position: relative;
     display: inline-flex;
+    margin-top: clamp(26px, 5vh, 48px);
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: none;                 /* 悬停时藏光标 */
+    font-family: var(--zw-mono);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    animation: rise 1s cubic-bezier(.2,.8,.2,1) .55s both;
+  }
+  .zw-entry:focus-visible { outline: 2px solid rgba(255,255,255,.55); outline-offset: 3px; border-radius: 17px; }
+
+  .zw-jelly-body {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-top: clamp(26px, 5vh, 48px);
     padding: 14px 30px;
     background: rgba(255,255,255,.05);
     border: 1px solid rgba(255,255,255,.2);
     border-radius: 17px;
-    cursor: none;                 /* 悬在果冻上时藏光标 */
     color: rgba(255,255,255,.92); /* 与标题同一白 */
-    font-family: var(--zw-mono);
     font-size: 12.5px;
     letter-spacing: .32em;
     user-select: none;
     -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    transition: color .3s, border-color .3s, background .3s;
-    animation: rise 1s cubic-bezier(.2,.8,.2,1) .55s both;
-  }
-  .zw-entry:hover { color: rgba(255,255,255,.92); border-color: rgba(255,255,255,.34); background: rgba(255,255,255,.07); }
-  .zw-entry:focus-visible { outline: 2px solid rgba(255,255,255,.55); outline-offset: 3px; }
-
-  .zw-entry-txt {
-    position: relative;
-    z-index: 1;
-    padding-left: .32em;   /* 抵消 letter-spacing 尾巴，视觉居中 */
-    white-space: nowrap;
+    transition: border-color .3s, background .3s;
     will-change: transform;
   }
+  .zw-entry:hover .zw-jelly-body { border-color: rgba(255,255,255,.34); background: rgba(255,255,255,.07); }
 
-  .zw-jelly {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;   /* 允许果冻鼓包溢出按钮框 */
-    pointer-events: none;
-    display: block;
-  }
-  .zw-blob {
-    fill: rgba(255,255,255,.055);
-    stroke: rgba(255,255,255,.32);
-    stroke-width: 1.2;
-  }
-  .zw-blob-gloss { fill: url(#zwGloss); }
-
-  /* 果冻接管后，CSS 底衬退场，只留 SVG 软体 */
-  .zw-entry.zw-jelly-on,
-  .zw-entry.zw-jelly-on:hover {
-    background: transparent;
-    border-color: transparent;
+  .zw-entry-txt {
+    white-space: nowrap;
+    padding-left: .32em;   /* 抵消 letter-spacing 尾巴，视觉居中 */
   }
 
   /* ---------- 紫微命门浮层 ---------- */
@@ -596,7 +579,7 @@
     .zw-kv { font-size: 10px; }
     .zw-form { gap: 14px; }
     .zw-ai-log { max-height: 300px; font-size: 13.5px; }
-    .zw-entry { padding: 12px 24px; font-size: 11.5px; letter-spacing: .26em; }
+    .zw-jelly-body { padding: 12px 24px; font-size: 11.5px; letter-spacing: .26em; }
     .zw-entry-txt { padding-left: .26em; }
   }
 
@@ -625,18 +608,7 @@
     <h1 class="line l1">我思</h1>
     <h1 class="line l2">故我在。</h1>
     <button class="zw-entry" id="zw-entry" type="button" aria-label="打开紫微命门">
-      <svg class="zw-jelly" aria-hidden="true" focusable="false">
-        <defs>
-          <radialGradient id="zwGloss" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="60">
-            <stop offset="0" stop-color="#ffffff" stop-opacity=".13"/>
-            <stop offset=".55" stop-color="#ffffff" stop-opacity=".05"/>
-            <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <path class="zw-blob" d=""/>
-        <path class="zw-blob-gloss" d=""/>
-      </svg>
-      <span class="zw-entry-txt">紫微命门</span>
+      <span class="zw-jelly-body"><span class="zw-entry-txt">紫微命门</span></span>
     </button>
   </div>
 </div>
