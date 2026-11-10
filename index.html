@@ -155,10 +155,15 @@
     color-scheme: dark;
     transform: translateY(18px);
     opacity: 0;
-    transition: transform .7s cubic-bezier(.2,.8,.2,1), opacity .6s ease;
+    transition: transform .55s cubic-bezier(.2,.8,.2,1), opacity .45s ease;  /* 关闭：立即退场 */
     min-width: 0;
   }
-  .zw-overlay.on .zw-card { transform: none; opacity: 1; }
+  /* 打开：延迟 0.5s 等首页文字退场过半再浮现 */
+  .zw-overlay.on .zw-card {
+    transform: none;
+    opacity: 1;
+    transition: transform .7s cubic-bezier(.2,.8,.2,1) .5s, opacity .6s ease .5s;
+  }
   .zw-card > #zw-body > * { max-width: 900px; }        /* 内容限宽，不拉满 */
 
   .zw-close {
@@ -183,9 +188,16 @@
   .zw-close:hover { color: #fff; border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.08); }
   .zw-close:active { transform: scale(.93); }
 
-  /* 打开命门：首页文字缓慢隐去、入口退场（星空同时冻结，见脚本） */
+  /* 打开命门：首页文字缓慢隐去、入口退场（星空同时冻结，见脚本）
+     注意：rise 动画的 both 填充会把末帧钉在元素上、压过这里的 opacity，
+     必须同时摘掉动画才能让过渡生效 */
   .stage .line,
-  .stage .zw-entry { transition: opacity 1s ease, filter 1s ease; }
+  .stage .zw-entry {
+    transition: opacity 1s ease, filter 1s ease;
+    transition-delay: .3s;               /* 关闭时：等表单退完再淡回 */
+  }
+  body.zw-open .stage .line,
+  body.zw-open .stage .zw-entry { animation: none; transition-delay: 0s; }
   body.zw-open .stage .line { opacity: 0; filter: blur(8px); }
   body.zw-open .stage .zw-entry { opacity: 0; pointer-events: none; }
 
