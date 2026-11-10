@@ -27,7 +27,6 @@
 
   /* ---------- DOM ---------- */
   const overlay = document.getElementById('zw-overlay');
-  const card = overlay.querySelector('.zw-card');
   const body = document.getElementById('zw-body');
   const entryBtn = document.getElementById('zw-entry');
   const closeBtn = document.getElementById('zw-close');
@@ -57,12 +56,18 @@
   let firstAsked = false;
 
   /* ---------- 开 / 关 ---------- */
+  const toggleSky = on => window.dispatchEvent(new CustomEvent('ziwei:toggle', { detail: { open: on } }));
   const open = () => {
     overlay.classList.add('on');
-    document.body.style.overflow = 'hidden';
+    document.body.classList.add('zw-open');      /* 首页文字缓慢隐去 */
+    toggleSky(true);                              /* 星空冻结 */
     if (!opened) { opened = true; renderForm(); }
   };
-  const close = () => overlay.classList.remove('on');
+  const close = () => {
+    overlay.classList.remove('on');
+    document.body.classList.remove('zw-open');  /* 文字淡回 */
+    toggleSky(false);                             /* 星空复活 */
+  };
   entryBtn.addEventListener('click', open);
   closeBtn.addEventListener('click', close);
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
@@ -188,7 +193,7 @@
     const f = readForm();
     const fail = msg => {
       err.textContent = msg; err.classList.add('on');
-      card.scrollTo({ top: 0, behavior: 'smooth' });
+      overlay.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     /* 校验 */
@@ -283,7 +288,7 @@
 
   function renderChart(f) {
     compact = buildCompact(f);
-    card.scrollTo({ top: 0 });
+    overlay.scrollTo({ top: 0 });
 
     const brightCls = b => ({
       '庙': '', '旺': '', '得': 'b2', '利': 'b2', '平': 'b3',
@@ -387,7 +392,7 @@
         <div class="zw-ai-note">STREAMED FROM api.haoran.lu · 内容由 AI 生成，仅供参考，不构成人生决策建议</div>
       </div>`;
 
-    $('zw-redo').addEventListener('click', () => { renderForm(); card.scrollTo({ top: 0 }); });
+    $('zw-redo').addEventListener('click', () => { renderForm(); overlay.scrollTo({ top: 0 }); });
     $('zw-ai-start').addEventListener('click', () => askAI());
     $('zw-ai-send').addEventListener('click', sendFollowUp);
     $('zw-ai-q').addEventListener('keydown', e => { if (e.key === 'Enter') sendFollowUp(); });

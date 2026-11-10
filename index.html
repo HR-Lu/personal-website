@@ -129,72 +129,72 @@
     padding-left: .32em;   /* 抵消 letter-spacing 尾巴，视觉居中 */
   }
 
-  /* ---------- 紫微命门浮层 ---------- */
+  /* ---------- 紫微命门浮层（透明 · 无遮罩 · 黄金分割位） ---------- */
   .zw-overlay {
     position: fixed;
     inset: 0;
     z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 18px;
-    background: rgba(0,0,0,.30);           /* 极淡压暗，粒子背景依然可见 */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: transparent;            /* 不压暗、不遮罩：星空原样透出 */
     opacity: 0;
     visibility: hidden;
-    transition: opacity .32s ease, visibility .32s;
-    overscroll-behavior: contain;
-  }
-  .zw-overlay.on { opacity: 1; visibility: visible; }
-
-  .zw-card {
-    position: relative;
-    width: min(1040px, 100%);
-    max-height: min(88vh, 920px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    color-scheme: dark;
-    background: rgba(9,11,13,.58);
-    -webkit-backdrop-filter: blur(22px) saturate(1.25);
-    backdrop-filter: blur(22px) saturate(1.25);
-    border: 1px solid rgba(255,255,255,.10);
-    border-radius: 22px;
-    box-shadow: 0 32px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
-    padding: clamp(18px, 3.2vw, 36px) clamp(16px, 3.2vw, 40px);
-    transform: translateY(30px) scale(.94);
-    opacity: 0;
-    transition: transform .52s var(--zw-spring), opacity .3s ease;
+    pointer-events: none;
+    transition: opacity .5s ease, visibility .5s;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,.18) transparent;
+    scrollbar-color: rgba(255,255,255,.12) transparent;
+  }
+  .zw-overlay.on { opacity: 1; visibility: visible; pointer-events: auto; }
+  .zw-overlay::-webkit-scrollbar { width: 6px; }
+  .zw-overlay::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
+
+  /* 容器：完全透明，只负责定位——与首页文字同一套黄金分割坐标与左轴线 */
+  .zw-card {
+    width: 100%;
+    padding: 36.5vh clamp(22px, 9.5vw, 160px) 8vh;   /* 表单头部 ≈ 黄金分割位 */
+    color-scheme: dark;
+    transform: translateY(18px);
+    opacity: 0;
+    transition: transform .7s cubic-bezier(.2,.8,.2,1), opacity .6s ease;
+    min-width: 0;
   }
   .zw-overlay.on .zw-card { transform: none; opacity: 1; }
-  .zw-card::-webkit-scrollbar { width: 6px; }
-  .zw-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 3px; }
+  .zw-card > #zw-body > * { max-width: 900px; }        /* 内容限宽，不拉满 */
 
   .zw-close {
-    position: sticky;
-    top: 0;
-    float: right;
-    margin: -6px -6px 0 0;
-    z-index: 5;
-    background: rgba(255,255,255,.05);
-    border: 1px solid rgba(255,255,255,.12);
+    position: fixed;
+    top: 22px;
+    right: clamp(18px, 4vw, 44px);
+    z-index: 60;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.14);
     border-radius: 10px;
-    color: rgba(255,255,255,.55);
+    color: rgba(255,255,255,.5);
     font-family: var(--zw-mono);
     font-size: 11px;
     letter-spacing: .12em;
     padding: 7px 12px;
     cursor: pointer;
     transition: all .25s;
+    opacity: 0;
+    pointer-events: none;
   }
-  .zw-close:hover { color: #fff; border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.1); }
+  body.zw-open .zw-close { opacity: 1; pointer-events: auto; }
+  .zw-close:hover { color: #fff; border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.08); }
   .zw-close:active { transform: scale(.93); }
+
+  /* 打开命门：首页文字缓慢隐去、入口退场（星空同时冻结，见脚本） */
+  .stage .line,
+  .stage .zw-entry { transition: opacity 1s ease, filter 1s ease; }
+  body.zw-open .stage .line { opacity: 0; filter: blur(8px); }
+  body.zw-open .stage .zw-entry { opacity: 0; pointer-events: none; }
 
   .zw-label {
     font-family: var(--zw-mono);
     font-size: 11px;
     letter-spacing: .3em;
     color: rgba(255,255,255,.42);
+    text-shadow: 0 0 14px rgba(0,0,0,.7);
   }
   .zw-title {
     font-weight: 600;
@@ -203,13 +203,21 @@
     color: rgba(255,255,255,.92);
     margin-top: 10px;
     line-height: 1.3;
+    text-shadow: 0 0 18px rgba(0,0,0,.75);
   }
-  .zw-sub { margin-top: 8px; font-size: 13px; color: rgba(255,255,255,.52); line-height: 1.8; }
+  .zw-sub {
+    margin-top: 8px;
+    font-size: 13px;
+    color: rgba(255,255,255,.52);
+    line-height: 1.8;
+    max-width: 480px;
+    text-shadow: 0 0 12px rgba(0,0,0,.7);
+  }
 
   /* ---------- 表单 ---------- */
   .zw-form {
     max-width: 470px;
-    margin: 26px auto 6px;
+    margin: 30px 0 6px;          /* 左对齐，与首页文字同一轴线 */
     display: flex;
     flex-direction: column;
     gap: 17px;
@@ -447,6 +455,7 @@
     font-size: 14px;
     line-height: 2;
     color: rgba(255,255,255,.85);
+    text-shadow: 0 1px 10px rgba(0,0,0,.55);
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,.14) transparent;
   }
@@ -553,6 +562,7 @@
     .zw-cell, .zw-center, .zw-ai { animation: none; }
     .zw-card { transition: opacity .2s; transform: none; }
     .zw-overlay.on .zw-card { transform: none; }
+    .stage .line, .stage .zw-entry { transition: opacity .2s; }
   }
 
   /* ---------- 手机端 ---------- */
@@ -569,8 +579,7 @@
       color: rgba(255,255,255,.95);
       white-space: normal;       /* 极窄屏也允许折行，不溢出 */
     }
-    .zw-overlay { padding: 10px; }
-    .zw-card { max-height: 92dvh; border-radius: 18px; }
+    .zw-card { padding-top: 32vh; padding-left: max(20px, env(safe-area-inset-left)); padding-right: 20px; }
     .zw-grid { gap: 5px; grid-auto-rows: minmax(104px, auto); }
     .zw-cell { padding: 6px 7px; border-radius: 9px; }
     .zw-major { font-size: 11.5px; }
@@ -592,7 +601,7 @@
   @media (max-height: 480px) and (orientation: landscape) {
     .block { top: 36%; padding-left: max(24px, env(safe-area-inset-left)); }
     .line { font-size: clamp(26px, 5vw, 40px); line-height: 1.2; }
-    .zw-card { max-height: 94dvh; }
+    .zw-card { padding-top: 18vh; }
   }
 </style>
 </head>
@@ -613,13 +622,11 @@
   </div>
 </div>
 
-<!-- 紫微命门浮层：点入口弹出，背景粒子不变 -->
+<!-- 紫微命门浮层：透明无遮罩，星空透出，粒子冻结 -->
 <div class="zw-overlay" id="zw-overlay" role="dialog" aria-modal="true" aria-label="紫微命门">
-  <div class="zw-card">
-    <button class="zw-close" id="zw-close" type="button">ESC ✕</button>
-    <div id="zw-body"></div>
-  </div>
+  <div class="zw-card"><div id="zw-body"></div></div>
 </div>
+<button class="zw-close" id="zw-close" type="button">ESC ✕</button>
 
 <script src="assets/jelly-button.js" defer></script>
 <script src="assets/ziwei-ui.js" defer></script>
@@ -810,12 +817,26 @@
     clearTimeout(rt);
     rt = setTimeout(resize, 150);
   }, { passive: true });
+  /* 紫微命门开关：冻结/恢复星空（画面保留，回来继续，不跳变） */
+  let frozen = false;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       running = false;
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
-    } else if (!running) {
+    } else if (!running && !frozen) {
+      running = true;
+      lastT = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+  });
+  window.addEventListener('ziwei:toggle', e => {
+    frozen = !!e.detail.open;
+    if (frozen) {
+      running = false;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;                          /* canvas 保留最后一帧 → 静止星空 */
+    } else if (!document.hidden) {
       running = true;
       lastT = performance.now();
       raf = requestAnimationFrame(frame);
