@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>鲁浩然</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+
+  body {
+    background: #000;
+    -webkit-text-size-adjust: 100%;   /* 防止 iOS 横竖屏切换时自动放大字号 */
+    text-size-adjust: 100%;
+  }
+
+  .bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  /* mos 原站顶部那层灰色径向柔光 */
+  .bg-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(120% 80% at 50% -8%, rgba(58,60,72,.22), transparent 56%);
+  }
+  #sky {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* 文字层：左对齐，位置按黄金分割摆放 */
+  .stage {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .block {
+    position: absolute;
+    left: 0;
+    /* 重心精确落在视口高度的 38.2% */
+    top: 38.2%;
+    transform: translate3d(0, -50%, 0);
+    padding-left: clamp(22px, 9.5vw, 160px);
+  }
+
+  .line {
+    font-family: "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Source Han Sans SC",
+                 "Microsoft YaHei", sans-serif;
+    font-weight: 600;
+    font-size: clamp(40px, 5.6vw, 78px);
+    letter-spacing: .14em;
+    line-height: 1.2;
+    color: rgba(255,255,255,.92);
+    white-space: nowrap;
+  }
+
+  .l1 { animation: rise 1s cubic-bezier(.2,.8,.2,1) both; }
+  .l2 { animation: rise 1s cubic-bezier(.2,.8,.2,1) .12s both; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+    to   { opacity: 1; transform: none; filter: blur(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #sky { display: none; }
+    .l1, .l2 { animation: none; }
+  }
+
+  /* ---------- 手机端 ---------- */
+  @media (max-width: 640px) {
+    .block {
+      top: 36%;                  /* 小屏略上移，避免重心偏下 */
+      padding-left: max(20px, env(safe-area-inset-left));
+      padding-right: 20px;
+    }
+    .line {
+      font-size: clamp(38px, 12vw, 64px);
+      letter-spacing: .1em;
+      line-height: 1.26;
+      color: rgba(255,255,255,.95);
+      white-space: normal;       /* 极窄屏也允许折行，不溢出 */
+    }
+  }
+
+  /* ---------- 平板 ---------- */
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .line { font-size: clamp(56px, 8vw, 80px); }
+  }
+
+  /* 横屏小高度（比如手机横放） */
+  @media (max-height: 480px) and (orientation: landscape) {
+    .block { top: 36%; padding-left: max(24px, env(safe-area-inset-left)); }
+    .line { font-size: clamp(26px, 5vw, 40px); line-height: 1.2; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg">
+  <div class="bg-glow"></div>
+  <canvas id="sky"></canvas>
+</div>
+
+<div class="stage">
+  <div class="block">
+    <h1 class="line l1">我思</h1>
+    <h1 class="line l2">故我在。</h1>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   mos.caldis.me 背景一比一移植
+   参数、运动公式、光学结构（lighter 画线 + destination-out 擦除拖尾）完全照抄
+   ========================================================================= */
+(() => {
+  const CFG = {
+    densityDesktop: 2,
+    densityCoarse: 1,
+    countMin: 800,
+    countMax: 2000,
+    damping: .83,
+    dampingScroll: .14,
+    accel: 1.15,
+    speedBase: .2,
+    speedScroll: 0,
+    fieldScaleX: .003,
+    fieldScaleY: .002,
+    fieldScaleXY: .001,
+    angleMul: .1,
+    timeX: 0,
+    timeY: .00015,
+    timeXY: .00035,
+    influenceR: 490,
+    swirl: 3,
+    fade: .115,
+    fadeScroll: .3,
+    lineWidth: 1.25,
+    opacityA: .5,
+    opacityB: .43,
+    opacityC: .36
+  };
+
+  const canvas = document.getElementById('sky');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  if (!ctx) return;
+
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+
+  let W = 1, H = 1, DPR = 1;
+  let particles = [];
+  let raf = 0, running = true, lastT = performance.now();
+  const ptr = { x: -1e4, y: -1e4, active: false };
+
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const rnd = x => { const t = 1e4 * Math.sin(x); return t - Math.floor(t); };
+
+  const makeParticle = i => {
+    const t = 12.345 * i;
+    return {
+      x: rnd(t) * W,
+      y: rnd(t + 1) * H,
+      vx: 0,
+      vy: 0,
+      seed: 1e3 * rnd(t + 2),
+      color: i % 3
+    };
+  };
+
+  const targetCount = () => {
+    const coarse = window.matchMedia?.('(pointer: coarse)')?.matches;
+    const density = coarse ? CFG.densityCoarse : CFG.densityDesktop;
+    const lo = Math.min(CFG.countMin, CFG.countMax);
+    const hi = Math.max(CFG.countMin, CFG.countMax);
+    return clamp(Math.floor(W * H / 5e3 * density), lo, hi);
+  };
+
+  const resize = () => {
+    const rect = canvas.getBoundingClientRect();
+    W = Math.max(1, Math.floor(rect.width));
+    H = Math.max(1, Math.floor(rect.height));
+    DPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));   // 上限 2，省填充率
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    particles = Array.from({ length: targetCount() }, (_, i) => makeParticle(i));
+    ctx.clearRect(0, 0, W, H);
+  };
+
+  const onPointer = e => {
+    const rect = canvas.getBoundingClientRect();
+    ptr.x = e.clientX - rect.left;
+    ptr.y = e.clientY - rect.top;
+    ptr.active = true;
+  };
+  const onBlur = () => { ptr.active = false; ptr.x = -1e4; ptr.y = -1e4; };
+
+  const fieldAngle = (x, y, now, seed) =>
+    (Math.sin(x * CFG.fieldScaleX + (seed + now) * CFG.timeX) +
+     Math.cos(y * CFG.fieldScaleY - (seed - now) * CFG.timeY) +
+     Math.sin((x + y) * CFG.fieldScaleXY + (seed + now) * CFG.timeXY)) / 3
+    * Math.PI * CFG.angleMul;
+
+  const STROKES = [
+    `rgba(255,255,255,${CFG.opacityA})`,
+    `rgba(255,255,255,${CFG.opacityB})`,
+    `rgba(255,255,255,${CFG.opacityC})`
+  ];
+
+  const frame = now => {
+    if (!running) return;
+    const dt = clamp(now - lastT, 6, 28);
+    lastT = now;
+
+    const want = targetCount();
+    if (particles.length < want) {
+      for (let i = particles.length; i < want; i++) particles.push(makeParticle(i));
+    } else if (particles.length > want) {
+      particles.length = want;
+    }
+
+    const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const scrollP = clamp(window.scrollY / maxScroll, 0, 1);
+    const fade = clamp(CFG.fade + scrollP * CFG.fadeScroll, 0, 1);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = `rgba(0,0,0,${fade})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = CFG.lineWidth;
+
+    const speed = CFG.speedBase + scrollP * CFG.speedScroll;
+    const keep = clamp(CFG.damping + scrollP * CFG.dampingScroll, 0, .99);
+    const R = CFG.influenceR;
+    const segs = [[], [], []];              // 同色合并，每帧只 stroke 3 次
+    const step = speed * (dt / 16);
+
+    for (const p of particles) {
+      const ox = p.x, oy = p.y;
+
+      const a = fieldAngle(ox, oy, now, p.seed);
+      p.vx = p.vx * keep + Math.cos(a) * CFG.accel;
+      p.vy = p.vy * keep + Math.sin(a) * CFG.accel;
+
+      if (ptr.active && R > 0) {
+        const dx = ox - ptr.x, dy = oy - ptr.y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        if (d < R) {
+          const k = (1 - d / R) * CFG.swirl;
+          p.vx += -dy / d * k;
+          p.vy += dx / d * k;
+        }
+      }
+
+      const nx = ox + p.vx * step;
+      const ny = oy + p.vy * step;
+      p.x = nx;
+      p.y = ny;
+      segs[p.color].push(ox, oy, nx, ny);
+
+      if (nx < -40 || nx > W + 40 || ny < -40 || ny > H + 40) {
+        const s = p.seed + .001 * now;
+        p.x = rnd(s) * W;
+        p.y = rnd(s + 1) * H;
+        p.vx = 0;
+        p.vy = 0;
+      }
+    }
+
+    for (let c = 0; c < 3; c++) {
+      const arr = segs[c];
+      if (!arr.length) continue;
+      ctx.strokeStyle = STROKES[c];
+      ctx.beginPath();
+      for (let i = 0; i < arr.length; i += 4) {
+        ctx.moveTo(arr[i], arr[i + 1]);
+        ctx.lineTo(arr[i + 2], arr[i + 3]);
+      }
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    raf = requestAnimationFrame(frame);
+  };
+
+  window.addEventListener('pointermove', onPointer, { passive: true });
+  window.addEventListener('blur', onBlur);
+  let rt = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(rt);
+    rt = setTimeout(resize, 150);
+  }, { passive: true });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      running = false;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    } else if (!running) {
+      running = true;
+      lastT = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+  });
+
+  resize();
+  raf = requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
