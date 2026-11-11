@@ -56,17 +56,14 @@
   let firstAsked = false;
 
   /* ---------- 开 / 关 ---------- */
-  const toggleSky = on => window.dispatchEvent(new CustomEvent('ziwei:toggle', { detail: { open: on } }));
   const open = () => {
     overlay.classList.add('on');
-    document.body.classList.add('zw-open');      /* 首页文字缓慢隐去 */
-    toggleSky(true);                              /* 星空冻结 */
+    document.body.classList.add('zw-open');      /* 首页文字隐去，星空继续流动 */
     if (!opened) { opened = true; renderForm(); }
   };
   const close = () => {
     overlay.classList.remove('on');
     document.body.classList.remove('zw-open');  /* 文字淡回 */
-    toggleSky(false);                             /* 星空复活 */
   };
   entryBtn.addEventListener('click', open);
   closeBtn.addEventListener('click', close);
@@ -81,17 +78,43 @@
 
   function mdToHtml(text) {
     let h = esc(text);
+    /* 解读固定四段：段首小标题统一成加粗标题，模型加不加粗都好看 */
+    h = h.replace(/^(?:\*\*)?(性格|事业|感情|提醒)(?:\*\*)?[：:]/gm, '<b class="md-k">$1</b>');
     h = h.replace(/^#{1,4}\s*(.+)$/gm, '<span class="md-h">$1</span>');
     h = h.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
     h = h.replace(/^\s*[-•]\s+(.+)$/gm, '<span class="md-li">· $1</span>');
+    h = h.replace(/\n{2,}/g, '<br>');
     h = h.replace(/\n/g, '<br>');
     return h;
+  }
+
+  /* 首次解读的格式指令：服务端按 question 解析，等于给首轮加约束，
+     换来「结构固定、篇幅短、直给结论」的解读，而不是又长又散的小作文 */
+  const FIRST_INSTRUCTION =
+    '直接给结论。四段，段首分别为「性格」「事业」「感情」「提醒」，每段 1-2 句；' +
+    '每段末尾用括号注明依据（宫位 + 星曜 + 四化）。全文 220 字以内。' +
+    '不要思考过程、不要开场白、不要总结段、不要免责声明。';
+
+  /* 追问也限长，否则模型又会铺开写 */
+  const FOLLOW_SUFFIX = '\n\n（回答控制在 200 字内，直接给结论和依据，不要免责声明。）';
+
+  /* 输出清洗：去掉模型爱加的免责声明、空段、复读开场白 */
+  function cleanOutput(text) {
+    const lines = text
+      .split('\n')
+      .filter(l => !/^\s*(以上内容仅供参考|仅供参考|不构成.{0,12}建议|注[:：]?\s*仅供)/.test(l));
+    while (lines.length && !lines[0].trim()) lines.shift();
+    if (lines.length && /^(好的|以下是|根据(您|你)提供的?命盘)/.test(lines[0].trim()) && lines[0].trim().length <= 30) {
+      lines.shift();
+    }
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
   /* =========================================================
      表单
      ========================================================= */
   function renderForm() {
+    overlay.scrollTop = 0;              /* 手机上整页滚动后回到顶部 */
     const saved = {};
     try { Object.assign(saved, JSON.parse(localStorage.getItem('zw-form') || '{}')); } catch {}
     const def = { name: saved.name || '', gender: saved.gender || 'male', cal: saved.cal || 'solar' };
@@ -104,42 +127,46 @@
         `<option value="${i + 1}">${BRANCHES[i + 1]}时 · ${['01–03','03–05','05–07','07–09','09–11','11–13','13–15','15–17','17–19','19–21','21–23'][i]}</option>`).join('');
 
     body.innerHTML = `
-      <div class="zw-label">// ZIWEI · 观星问命</div>
-      <div class="zw-title">紫微命门</div>
-      <p class="zw-sub">紫微斗数以出生时辰排定十二宫，星曜布局与四化流转，尽在盘中。输入出生信息，即可开启你的命盘与 AI 解读。</p>
-      <form class="zw-form" id="zw-form" novalidate>
-        <div class="zw-field"><label>称呼 · NAME</label>
-          <input class="zw-input" id="zf-name" type="text" maxlength="12" placeholder="昵称，可留空" value="${esc(def.name)}">
-        </div>
-        <div class="zw-field"><label>性别 · GENDER</label>
-          <div class="zw-seg" id="zf-gender">
-            <button type="button" data-v="male" class="${def.gender === 'male' ? 'sel' : ''}">男</button>
-            <button type="button" data-v="female" class="${def.gender === 'female' ? 'sel' : ''}">女</button>
+      <div class="zw-cols zw-cols-form">
+        <form class="zw-form" id="zw-form" novalidate>
+          <div class="zw-form-head">
+            <div class="zw-title">紫微命门</div>
           </div>
-        </div>
-        <div class="zw-field"><label>历法 · CALENDAR</label>
-          <div class="zw-seg" id="zf-cal">
-            <button type="button" data-v="solar" class="${def.cal === 'solar' ? 'sel' : ''}">公历</button>
-            <button type="button" data-v="lunar" class="${def.cal === 'lunar' ? 'sel' : ''}">农历</button>
+          <div class="zw-field"><label>称呼 <i class="zw-req">*</i></label>
+            <input class="zw-input" id="zf-name" type="text" maxlength="12" enterkeyhint="done" placeholder="请填写称呼" value="${esc(def.name)}">
           </div>
-        </div>
-        <div class="zw-field" id="zf-solar-wrap"><label>出生日期 · 公历</label>
-          <input class="zw-input" id="zf-date" type="date" min="1901-01-01" max="2099-12-31" value="${saved.solarDate || '1995-06-15'}">
-        </div>
-        <div class="zw-field" id="zf-lunar-wrap" style="display:none"><label>出生日期 · 农历</label>
           <div class="zw-row">
-            <input class="zw-input" id="zf-lyear" type="number" min="1901" max="2099" step="1" value="${saved.lunarYear || 1995}">
-            <select class="zw-select" id="zf-lmonth">${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${lunarMonthName(i + 1)}</option>`).join('')}</select>
-            <select class="zw-select" id="zf-lday">${Array.from({ length: 30 }, (_, i) => `<option value="${i + 1}">${lunarDayName(i + 1)}</option>`).join('')}</select>
+            <div class="zw-field"><label>性别</label>
+              <div class="zw-seg" id="zf-gender">
+                <button type="button" data-v="male" class="${def.gender === 'male' ? 'sel' : ''}">男</button>
+                <button type="button" data-v="female" class="${def.gender === 'female' ? 'sel' : ''}">女</button>
+              </div>
+            </div>
+            <div class="zw-field"><label>历法</label>
+              <div class="zw-seg" id="zf-cal">
+                <button type="button" data-v="solar" class="${def.cal === 'solar' ? 'sel' : ''}">公历</button>
+                <button type="button" data-v="lunar" class="${def.cal === 'lunar' ? 'sel' : ''}">农历</button>
+              </div>
+            </div>
           </div>
-          <label class="zw-check"><input type="checkbox" id="zf-lleap">闰月（若出生在闰月请勾选）</label>
-        </div>
-        <div class="zw-field"><label>出生时辰 · HOUR</label>
-          <select class="zw-select" id="zf-hour">${hours}</select>
-        </div>
-        <div class="zw-err" id="zf-err"></div>
-        <button class="zw-go" id="zf-go" type="submit">排 盘</button>
-      </form>`;
+          <div class="zw-field" id="zf-solar-wrap"><label>出生日期（公历）</label>
+            <input class="zw-input" id="zf-date" type="date" min="1901-01-01" max="2099-12-31" value="${saved.solarDate || '1995-06-15'}">
+          </div>
+          <div class="zw-field" id="zf-lunar-wrap" style="display:none"><label>出生日期（农历）</label>
+            <div class="zw-row">
+              <input class="zw-input" id="zf-lyear" type="number" min="1901" max="2099" step="1" value="${saved.lunarYear || 1995}">
+              <select class="zw-select" id="zf-lmonth">${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${lunarMonthName(i + 1)}</option>`).join('')}</select>
+              <select class="zw-select" id="zf-lday">${Array.from({ length: 30 }, (_, i) => `<option value="${i + 1}">${lunarDayName(i + 1)}</option>`).join('')}</select>
+            </div>
+            <label class="zw-check"><input type="checkbox" id="zf-lleap">闰月</label>
+          </div>
+          <div class="zw-field"><label>出生时辰</label>
+            <select class="zw-select" id="zf-hour">${hours}</select>
+          </div>
+          <div class="zw-err" id="zf-err"></div>
+          <button class="zw-go" id="zf-go" type="submit">排 盘</button>
+        </form>
+      </div>`;
 
     /* 分段选择器 */
     const segInit = (id, key) => {
@@ -193,10 +220,13 @@
     const f = readForm();
     const fail = msg => {
       err.textContent = msg; err.classList.add('on');
-      overlay.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     /* 校验 */
+    if (!f.name) {
+      $('zf-name').focus();
+      return fail('请先填写称呼');
+    }
     if (f.cal === 'solar') {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(f.solarDate)) return fail('请选择一个有效的公历日期');
     } else {
@@ -287,8 +317,8 @@
   }
 
   function renderChart(f) {
+    overlay.scrollTop = 0;
     compact = buildCompact(f);
-    overlay.scrollTo({ top: 0 });
 
     const brightCls = b => ({
       '庙': '', '旺': '', '得': 'b2', '利': 'b2', '平': 'b3',
@@ -310,19 +340,22 @@
       const minors = p.stars.filter(s => s.type === 'minor');
       let stars = '';
       if (!majors.length) {
-        stars = `<span class="zw-empty">空宫</span>`;
         if (p.borrowedStars && p.borrowedStars.length) {
-          stars += p.borrowedStars.map(n =>
-            `<span class="zw-major zw-borrow">${esc(n)}</span>`).join('');
-          stars += `<div class="zw-borrow-note">借对宫</div>`;
+          /* 空宫借对宫：主星半透明 + 「借」标记，不额外占行 */
+          stars = p.borrowedStars.map(n =>
+            `<span class="zw-major zw-borrow">${esc(n)}<sup>借</sup></span>`).join('');
+        } else {
+          stars = `<span class="zw-empty">空宫</span>`;
         }
       } else {
         stars += majors.map(starHTML).join('');
       }
       const kinds = [];
-      if (luckies.length) kinds.push(`<div class="zw-lucky">${luckies.map(s => esc(s.name) + (s.siHua ? `<i class="zw-hua ${HUA_CLS[s.siHua]}">${s.siHua}</i>` : '')).join('')}</div>`);
-      if (shas.length) kinds.push(`<div class="zw-sha">${shas.map(s => esc(s.name) + (s.siHua ? `<i class="zw-hua ${HUA_CLS[s.siHua]}">${s.siHua}</i>` : '')).join('')}</div>`);
-      if (minors.length) kinds.push(`<div class="zw-lucky" style="opacity:.55">${minors.map(s => esc(s.name)).join('')}</div>`);
+      const fortune = [];
+      if (luckies.length) fortune.push(`<div class="zw-lucky">${luckies.map(s => esc(s.name) + (s.siHua ? `<i class="zw-hua ${HUA_CLS[s.siHua]}">${s.siHua}</i>` : '')).join('')}</div>`);
+      if (shas.length) fortune.push(`<div class="zw-sha">${shas.map(s => esc(s.name) + (s.siHua ? `<i class="zw-hua ${HUA_CLS[s.siHua]}">${s.siHua}</i>` : '')).join('')}</div>`);
+      if (fortune.length) kinds.push(`<div class="zw-fortune">${fortune.join('')}</div>`);
+      if (minors.length) kinds.push(`<div class="zw-lucky zw-minor">${minors.map(s => esc(s.name)).join('')}</div>`);
       if (p.selfSihua && p.selfSihua.length)
         kinds.push(`<div class="zw-zihua">${p.selfSihua.map(x => `自化${esc(x.siHua)}·${esc(x.starName)}`).join(' ')}</div>`);
 
@@ -360,42 +393,58 @@
     const pillars = li.fourPillars ? li.fourPillars.join(' ') : null;
 
     body.innerHTML = `
-      <div class="zw-head">
-        <div>
-          <div class="zw-label">// ZIWEI CHART · 紫微命盘</div>
-          <div class="zw-title" style="font-size:clamp(18px,2.4vw,24px)">${esc(chartTitle)}</div>
+      <div class="zw-cols zw-cols-chart">
+        <div class="zw-col zw-col-ai">
+          <div class="zw-ai">
+            <div class="zw-label">解读</div>
+            <div class="zw-ai-log" id="zw-ailog">
+              <div class="zw-ai-hint">命盘已成，点击「开始解读」。</div>
+            </div>
+            <div class="zw-ai-chips" id="zw-ai-chips" hidden>
+              <button type="button">今年的感情</button>
+              <button type="button">事业方向</button>
+              <button type="button">要注意什么</button>
+            </div>
+            <div class="zw-ai-bar">
+              <button id="zw-ai-start" type="button">开始解读</button>
+              <input id="zw-ai-q" type="text" maxlength="200" enterkeyhint="send" placeholder="继续追问…" disabled>
+              <button id="zw-ai-send" type="button" disabled>发 送</button>
+            </div>
+          </div>
         </div>
-        <button class="zw-rebtn" id="zw-redo" type="button">↺ 重新排盘</button>
-      </div>
-      <div class="zw-grid">
-        ${cells}
-        <div class="zw-center">
-          <div class="zw-kv"><span>五行局</span><b>${esc(chart.wuxingJuName)}</b></div>
-          <div class="zw-kv"><span>命主 · 身主</span><b>${esc(chart.mingZhu || '—')} · ${esc(chart.shenZhu || '—')}</b></div>
-          <div class="zw-kv"><span>阴阳性别</span><b>${esc(chart.yinYangGender || '—')}</b></div>
-          <div class="zw-kv ${curDX ? 'hl' : ''}"><span>现行大限</span><b>${curDX ? `${curDX.startAge}–${curDX.endAge}岁 · ${esc(curDX.palaceName)}` : '—'}</b></div>
-          <div class="zw-kv"><span>时辰</span><b>${BRANCHES[chart.birthInfo.hour]}时${f.lateZi ? ' · 晚（按次日）' : f.hour === 0 ? ' · 早' : ''}</b></div>
-          ${pillars ? `<div class="zw-kv"><span>四柱</span><b>${esc(pillars)}</b></div>` : ''}
-          <div class="zw-kv"><span>虚岁</span><b>${chart.currentAge}</b></div>
+        <div class="zw-col zw-col-chart">
+          <div class="zw-head">
+            <div>
+              <div class="zw-label">紫微命盘</div>
+              <div class="zw-title zw-title-chart" style="font-size:clamp(14px,1.7vw,19px)">${esc(chartTitle)}</div>
+            </div>
+            <button class="zw-rebtn" id="zw-redo" type="button">↺ 重新排盘</button>
+          </div>
+          <div class="zw-grid">
+            ${cells}
+            <div class="zw-center">
+              <div class="zw-kv"><span>五行局</span><b>${esc(chart.wuxingJuName)}</b></div>
+              <div class="zw-kv"><span>命主 · 身主</span><b>${esc(chart.mingZhu || '—')} · ${esc(chart.shenZhu || '—')}</b></div>
+              <div class="zw-kv"><span>阴阳性别</span><b>${esc(chart.yinYangGender || '—')}</b></div>
+              <div class="zw-kv ${curDX ? 'hl' : ''}"><span>现行大限</span><b>${curDX ? `${curDX.startAge}–${curDX.endAge}岁 · ${esc(curDX.palaceName)}` : '—'}</b></div>
+              <div class="zw-kv"><span>时辰</span><b>${BRANCHES[chart.birthInfo.hour]}时${f.lateZi ? ' · 晚（按次日）' : f.hour === 0 ? ' · 早' : ''}</b></div>
+              ${pillars ? `<div class="zw-kv"><span>四柱</span><b>${esc(pillars)}</b></div>` : ''}
+              <div class="zw-kv"><span>虚岁</span><b>${chart.currentAge}</b></div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="zw-ai">
-        <div class="zw-label">// AI INTERPRETATION · AI 解读</div>
-        <div class="zw-ai-log" id="zw-ailog">
-          <div class="zw-ai-hint">命盘已成。点击「开始解读」，AI 将基于十二宫、星曜与四化，为你逐段展开分析。<br>解读完毕后可以继续追问。</div>
-        </div>
-        <div class="zw-ai-bar">
-          <button id="zw-ai-start" type="button">开始解读</button>
-          <input id="zw-ai-q" type="text" maxlength="200" placeholder="解读完成后，在这里追问…" disabled>
-          <button id="zw-ai-send" type="button" disabled>发 送</button>
-        </div>
-        <div class="zw-ai-note">STREAMED FROM api.haoran.lu · 内容由 AI 生成，仅供参考，不构成人生决策建议</div>
       </div>`;
 
-    $('zw-redo').addEventListener('click', () => { renderForm(); overlay.scrollTo({ top: 0 }); });
+    $('zw-redo').addEventListener('click', renderForm);
     $('zw-ai-start').addEventListener('click', () => askAI());
     $('zw-ai-send').addEventListener('click', sendFollowUp);
     $('zw-ai-q').addEventListener('keydown', e => { if (e.key === 'Enter') sendFollowUp(); });
+    /* 快捷问题：解读完成后出现，点一下直接问 */
+    $('zw-ai-chips').addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b || !firstAsked || streaming) return;
+      askAI(b.textContent.trim());
+    });
   }
 
   /* =========================================================
@@ -409,6 +458,8 @@
     send.disabled = on || !firstAsked;
     send.textContent = on ? '···' : '发 送';
     if (start && firstAsked) start.style.display = 'none';
+    const chips = $('zw-ai-chips');
+    if (chips) chips.hidden = !firstAsked || on;
   }
 
   function appendUserBubble(text) {
@@ -419,34 +470,71 @@
     log.appendChild(el);
   }
 
+  /* 首字前的等待提示：分段文案 + 模型思考字数，避免看起来像卡死 */
+  const WAIT_STEPS = [
+    ['正在推演命盘…', 0],
+    ['星曜与四化已就位，正在组织判断…', 8000],
+    ['模型正在逐宫推演，思路较长，请稍候…', 22000],
+  ];
+  const waitTimers = new WeakMap();
+  function startWait(el) {
+    const st = { t0: Date.now(), chars: 0, id: 0 };
+    const tick = () => {
+      const ms = Date.now() - st.t0;
+      let text = WAIT_STEPS[0][0];
+      for (const [t, at] of WAIT_STEPS) if (ms >= at) text = t;
+      const detail = st.chars ? `（已推演 ${st.chars} 字）` : '';
+      el.innerHTML = `<span class="zw-thinking">${text}${detail}</span>`;
+    };
+    tick();
+    st.id = setInterval(tick, 1000);
+    waitTimers.set(el, st);
+  }
+  function bumpWait(el, n) {
+    const st = waitTimers.get(el);
+    if (st) st.chars += n;
+  }
+  function stopWait(el) {
+    const st = waitTimers.get(el);
+    if (st) { clearInterval(st.id); waitTimers.delete(el); }
+  }
+
   function appendAssistantBubble() {
     const log = $('zw-ailog');
     const el = document.createElement('div');
-    el.className = 'zw-a-md zw-caret';
-    el.innerHTML = '<span class="zw-thinking">正在推演…</span>';
+    el.className = 'zw-a-md';
     log.appendChild(el);
+    startWait(el);
     return el;
   }
 
+  /* 窄屏是整页一起滚（滚动容器 = 浮层本身），桌面仍是解读区内部滚动 */
+  const isNarrow = () => window.matchMedia('(max-width: 860px)').matches;
+  const scroller = () => (isNarrow() ? overlay : $('zw-ailog'));
   const nearBottom = el => el.scrollHeight - el.scrollTop - el.clientHeight < 90;
   const scrollLog = force => {
-    const log = $('zw-ailog'); if (!log) return;
-    if (force || nearBottom(log)) log.scrollTop = log.scrollHeight;
+    const el = scroller(); if (!el) return;
+    if (force || nearBottom(el)) el.scrollTop = el.scrollHeight;
   };
 
   async function askAI(question) {
     if (streaming || !compact) return;
     const log = $('zw-ailog');
     log.querySelector('.zw-ai-hint')?.remove();
-    if (question) { appendUserBubble(question); scrollLog(true); }
+    if (question) { appendUserBubble(question); }
     const bubble = appendAssistantBubble();
+    /* 手机上整页一起滚，直接把新回答的起始位置送到眼前；桌面滚解读区 */
+    if (isNarrow()) bubble.scrollIntoView({ block: 'start' });
+    else scrollLog(true);
     setStreamingUI(true);
 
-    const payload = { chart: compact };
-    if (question) {
-      payload.question = question;
-      payload.history = history.slice(-12);
-    }
+    /* 首轮不带 question 时后端会走「完整解读」的长提示词，模型思考极久、输出冗长。
+       统一按追问通道发送，把格式要求写进 question，篇幅可控、出字更快。 */
+    const payload = {
+      chart: compact,
+      question: question ? question + FOLLOW_SUFFIX : FIRST_INSTRUCTION,
+    };
+    if (question) payload.history = history.slice(-12);
 
     let full = '';
     try {
@@ -478,19 +566,22 @@
           let j; try { j = JSON.parse(data); } catch { continue; }
           if (j.error) throw new Error(String(j.error));
           const delta = j.choices?.[0]?.delta || {};
+          /* 思考阶段不展示内容，只累计字数当进度，让等待有反馈 */
+          if (delta.reasoning_content) bumpWait(bubble, delta.reasoning_content.length);
           if (delta.content) {
+            if (full === '') stopWait(bubble);
             full += delta.content;
-            bubble.innerHTML = mdToHtml(full);
+            bubble.innerHTML = mdToHtml(cleanOutput(full));
             bubble.classList.add('zw-caret');
             scrollLog();
-          } else if (full === '' && delta.reasoning_content) {
-            bubble.innerHTML = '<span class="zw-thinking">正在推演…</span>';
           }
         }
       }
-      if (!full.trim()) full = '（模型没有返回内容，请稍后再试）';
+      full = cleanOutput(full);
+      if (!full) full = '（模型没有返回内容，请稍后再试）';
       bubble.innerHTML = mdToHtml(full);
       scrollLog();
+      /* 首轮的格式指令不是用户提问，不写进追问历史 */
       if (question) history.push({ role: 'user', content: question });
       /* 后端限制 history 每条 ≤4000 字符，超长解读截断入列（展示不受影响） */
       const trim4hist = s => s.length > 3800 ? s.slice(0, 3800) + '…（后略）' : s;
@@ -501,6 +592,7 @@
       const msg = String((e && e.message) || e);
       bubble.innerHTML = `<span class="zw-thinking" style="color:rgba(240,106,106,.75)">✕ ${esc(msg)}</span>`;
     } finally {
+      stopWait(bubble);
       bubble.classList.remove('zw-caret');
       setStreamingUI(false);
     }

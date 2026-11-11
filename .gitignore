@@ -1,2 +1,5 @@
 .DS_Store
 .screenshots/
+.trae-html-share-packages/
+deploy/
+deploy.zip

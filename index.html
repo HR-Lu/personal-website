@@ -8,10 +8,10 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   :root {
-    --zw-accent: #2EC8B0;
+    --zw-accent: #ffffff;     /* 强调色统一为白，不再用青绿 */
     --zw-ming: #D4A843;      /* 命宫标记 */
     --zw-shen: #64A8E8;     /* 身宫标记 */
-    --zw-hua-lu: #2EC8B0;
+    --zw-hua-lu: #EDEDED;    /* 四化·禄：改白，不用绿 */
     --zw-hua-quan: #E8933E;
     --zw-hua-ke: #7EB1F5;
     --zw-hua-ji: #F06A6A;
@@ -129,42 +129,48 @@
     padding-left: .32em;   /* 抵消 letter-spacing 尾巴，视觉居中 */
   }
 
-  /* ---------- 紫微命门浮层（透明 · 无遮罩 · 黄金分割位） ---------- */
+  /* ---------- 紫微命门浮层（透明 · 无遮罩 · 单屏不滚动） ---------- */
   .zw-overlay {
     position: fixed;
     inset: 0;
     z-index: 50;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    /* 左内边距与首页文字同一轴线，视觉上连贯 */
+    padding: clamp(18px, 4vh, 46px) clamp(22px, 6vw, 110px) clamp(18px, 4vh, 46px) clamp(22px, 9.5vw, 160px);
     background: transparent;            /* 不压暗、不遮罩：星空原样透出 */
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
+    overflow: hidden;                   /* 桌面端：整屏一页，不滚动 */
+    overscroll-behavior: contain;
     transition: opacity .5s ease, visibility .5s;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,.12) transparent;
+    color-scheme: dark;
   }
   .zw-overlay.on { opacity: 1; visibility: visible; pointer-events: auto; }
-  .zw-overlay::-webkit-scrollbar { width: 6px; }
-  .zw-overlay::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
 
-  /* 容器：完全透明，只负责定位——与首页文字同一套黄金分割坐标与左轴线 */
-  .zw-card {
+  /* 面板：占满浮层可用高度，内容在内部自己分配，全程不产生页面滚动 */
+  .zw-panel {
     width: 100%;
-    padding: 36.5vh clamp(22px, 9.5vw, 160px) 8vh;   /* 表单头部 ≈ 黄金分割位 */
-    color-scheme: dark;
-    transform: translateY(18px);
-    opacity: 0;
-    transition: transform .55s cubic-bezier(.2,.8,.2,1), opacity .45s ease;  /* 关闭：立即退场 */
+    max-width: 1180px;
+    height: 100%;
     min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(16px);
+    opacity: 0;
+    transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .4s ease;
   }
-  /* 打开：延迟 0.5s 等首页文字退场过半再浮现 */
-  .zw-overlay.on .zw-card {
+  /* 打开：等首页文字退场过半再浮现 */
+  .zw-overlay.on .zw-panel {
     transform: none;
     opacity: 1;
-    transition: transform .7s cubic-bezier(.2,.8,.2,1) .5s, opacity .6s ease .5s;
+    transition: transform .65s cubic-bezier(.2,.8,.2,1) .34s, opacity .55s ease .34s;
   }
-  .zw-card > #zw-body > * { max-width: 900px; }        /* 内容限宽，不拉满 */
+
+  #zw-body { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 
   .zw-close {
     position: fixed;
@@ -188,19 +194,20 @@
   .zw-close:hover { color: #fff; border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.08); }
   .zw-close:active { transform: scale(.93); }
 
-  /* 打开命门：首页文字缓慢隐去、入口退场（星空同时冻结，见脚本）
-     注意：rise 动画的 both 填充会把末帧钉在元素上、压过这里的 opacity，
+  /* 打开命门：首页文字缓慢隐去、入口退场（星空继续流动，不冻结） */
+  /* 注意：rise 动画的 both 填充会把末帧钉在元素上、压过这里的 opacity，
      必须同时摘掉动画才能让过渡生效 */
   .stage .line,
   .stage .zw-entry {
-    transition: opacity 1s ease, filter 1s ease;
-    transition-delay: .3s;               /* 关闭时：等表单退完再淡回 */
+    transition: opacity .7s ease, filter .7s ease;
+    transition-delay: .25s;              /* 关闭时：等面板退完再淡回 */
   }
   body.zw-open .stage .line,
   body.zw-open .stage .zw-entry { animation: none; transition-delay: 0s; }
   body.zw-open .stage .line { opacity: 0; filter: blur(8px); }
   body.zw-open .stage .zw-entry { opacity: 0; pointer-events: none; }
 
+  /* ---------- 浮层内文字层级 ---------- */
   .zw-label {
     font-family: var(--zw-mono);
     font-size: 11px;
@@ -210,37 +217,55 @@
   }
   .zw-title {
     font-weight: 600;
-    font-size: clamp(22px, 3vw, 30px);
+    font-size: clamp(26px, 3.4vw, 40px);
     letter-spacing: .12em;
-    color: rgba(255,255,255,.92);
-    margin-top: 10px;
-    line-height: 1.3;
+    color: rgba(255,255,255,.94);
+    margin-top: 12px;
+    line-height: 1.25;
     text-shadow: 0 0 18px rgba(0,0,0,.75);
   }
-  .zw-sub {
-    margin-top: 8px;
-    font-size: 13px;
-    color: rgba(255,255,255,.52);
-    line-height: 1.8;
-    max-width: 480px;
-    text-shadow: 0 0 12px rgba(0,0,0,.7);
+  /* ---------- 双栏骨架：左文右表 / 左解读右命盘 ---------- */
+  .zw-cols {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    gap: clamp(28px, 4.5vw, 68px);
+    padding-top: clamp(16px, 3vh, 30px);
   }
+  /* 表单页：单列贴左轴线（与首页文字同一黄金分割位置） */
+  .zw-cols-form {
+    width: 100%;
+    max-width: 420px;
+    margin: 0;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+  }
+  .zw-col {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .zw-col-form { justify-content: center; }
 
   /* ---------- 表单 ---------- */
   .zw-form {
-    max-width: 470px;
-    margin: 30px 0 6px;          /* 左对齐，与首页文字同一轴线 */
+    width: 100%;
+    max-width: 380px;
     display: flex;
     flex-direction: column;
-    gap: 17px;
+    gap: 13px;
   }
-  .zw-field { display: flex; flex-direction: column; gap: 7px; }
+  .zw-form-head { margin-bottom: 8px; }
+  .zw-field { display: flex; flex-direction: column; gap: 6px; }
   .zw-field > label {
     font-family: var(--zw-mono);
-    font-size: 11px;
+    font-size: 10.5px;
     letter-spacing: .22em;
-    color: rgba(255,255,255,.48);
+    color: rgba(255,255,255,.44);
   }
+  .zw-req { font-style: normal; color: rgba(233,199,124,.85); letter-spacing: 0; }
   .zw-seg {
     display: inline-flex;
     width: fit-content;
@@ -260,7 +285,7 @@
     transition: all .22s;
     font-family: var(--zw-sans);
   }
-  .zw-seg button.sel { background: rgba(46,200,176,.13); color: var(--zw-accent); }
+  .zw-seg button.sel { background: rgba(255,255,255,.13); color: #fff; }
   .zw-seg button:not(.sel):hover { color: rgba(255,255,255,.85); background: rgba(255,255,255,.04); }
 
   .zw-input, .zw-select {
@@ -288,8 +313,8 @@
   }
   .zw-select option { background: #101316; color: rgba(255,255,255,.9); }
   .zw-input:focus, .zw-select:focus {
-    border-color: rgba(46,200,176,.55);
-    box-shadow: 0 0 0 3px rgba(46,200,176,.13);
+    border-color: rgba(255,255,255,.55);
+    box-shadow: 0 0 0 3px rgba(255,255,255,.1);
   }
   .zw-row { display: flex; gap: 10px; }
   .zw-row > * { flex: 1; min-width: 0; }
@@ -298,12 +323,12 @@
   .zw-check input { accent-color: var(--zw-accent); width: 15px; height: 15px; cursor: pointer; }
 
   .zw-go {
-    margin-top: 6px;
-    border: 1px solid rgba(46,200,176,.5);
-    color: var(--zw-accent);
-    background: rgba(46,200,176,.07);
+    margin-top: 4px;
+    border: 1px solid rgba(255,255,255,.4);
+    color: rgba(255,255,255,.95);
+    background: rgba(255,255,255,.06);
     border-radius: 13px;
-    padding: 13px;
+    padding: 12px;
     font-size: 15px;
     letter-spacing: .42em;
     text-indent: .42em;
@@ -312,7 +337,7 @@
     cursor: pointer;
     transition: transform .3s var(--zw-spring), background .25s, box-shadow .25s;
   }
-  .zw-go:hover { background: rgba(46,200,176,.16); box-shadow: 0 6px 26px rgba(46,200,176,.14); transform: translateY(-1px); }
+  .zw-go:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.6); box-shadow: 0 6px 26px rgba(255,255,255,.08); transform: translateY(-1px); }
   .zw-go:active { transform: scale(.96); }
   .zw-go[disabled] { opacity: .45; pointer-events: none; }
 
@@ -332,8 +357,23 @@
   }
 
   /* ---------- 命盘十二宫 ---------- */
-  .zw-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .zw-head {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: nowrap;
+    padding-bottom: clamp(10px, 1.6vh, 18px);
+  }
+  .zw-head > div { min-width: 0; flex: 1; }
+  .zw-title-chart {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .zw-rebtn {
+    flex: none;
     background: none;
     border: 1px solid rgba(255,255,255,.14);
     border-radius: 9px;
@@ -349,41 +389,43 @@
   .zw-rebtn:active { transform: scale(.94); }
 
   .zw-grid {
-    margin-top: 20px;
+    flex: 1;
+    min-height: 0;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-auto-rows: minmax(118px, auto);
-    gap: 8px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: clamp(4px, .6vw, 9px);
+    container-type: size;          /* 字号按可用高度等比缩放，保证一屏装下 */
   }
   .zw-cell {
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    padding: 9px 10px;
-    background: rgba(255,255,255,.028);
-    border: 1px solid rgba(255,255,255,.075);
+    gap: 1px;
+    padding: clamp(4px, 1.6cqh, 10px) clamp(5px, .9vw, 11px);
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.14);
     border-radius: 12px;
     animation: zwCellIn .5s cubic-bezier(.2,.8,.2,1) both;
     overflow: hidden;
   }
   .zw-cell.cur {
-    border-color: rgba(46,200,176,.38);
-    background: rgba(46,200,176,.045);
-    box-shadow: inset 3px 0 0 rgba(46,200,176,.45);
+    border-color: rgba(233,199,124,.45);
+    background: rgba(233,199,124,.055);
   }
   @keyframes zwCellIn {
     from { opacity: 0; transform: scale(.88) translateY(8px); filter: blur(5px); }
     to   { opacity: 1; transform: none; filter: blur(0); }
   }
 
-  .zw-cell-top { display: flex; align-items: center; gap: 4px; padding-right: 4px; }
-  .zw-gname { font-size: 11px; letter-spacing: .06em; color: rgba(255,255,255,.5); white-space: nowrap; }
+  .zw-cell-top { display: flex; align-items: center; gap: 3px; padding-right: 4px; }
+  .zw-gname { font-size: clamp(9.5px, 1.7cqh, 12.5px); letter-spacing: .06em; color: rgba(255,255,255,.66); white-space: nowrap; }
   .zw-gname.g-ming { color: var(--zw-ming); }
   .zw-gname.g-shen { color: var(--zw-shen); }
   .zw-tag {
     font-style: normal;
-    font-size: 8px;
+    font-size: clamp(7px, 1.1cqh, 8px);
     line-height: 1;
     padding: 2px 4px;
     border-radius: 5px;
@@ -394,26 +436,26 @@
   .zw-dx {
     margin-left: auto;
     font-family: var(--zw-mono);
-    font-size: 9px;
-    color: rgba(255,255,255,.4);
+    font-size: clamp(8.5px, 1.35cqh, 10px);
+    color: rgba(255,255,255,.5);
     white-space: nowrap;
   }
-  .zw-cell.cur .zw-dx { color: rgba(46,200,176,.75); }
-  .zw-gz { font-family: var(--zw-mono); font-size: 9px; color: rgba(255,255,255,.32); }
+  .zw-cell.cur .zw-dx { color: rgba(233,199,124,.9); }
+  .zw-gz { font-family: var(--zw-mono); font-size: clamp(8.5px, 1.35cqh, 10px); color: rgba(255,255,255,.48); }
 
-  .zw-stars { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-  .zw-major { font-size: clamp(12px, 1.4vw, 13.5px); font-weight: 700; letter-spacing: .03em; line-height: 1.4; color: #E9C77C; white-space: nowrap; }
-  .zw-major.b2 { color: #DDBE72; }
-  .zw-major.b3 { color: #C0A45E; }
-  .zw-major.b4 { color: #94794B; }
-  .zw-major sup { font-size: 8px; color: rgba(233,199,124,.5); margin-left: 1px; font-weight: 400; }
+  .zw-stars { flex: 1; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 0 5px; min-height: 0; }
+  .zw-major { font-size: clamp(11px, 2.02cqh, 15px); font-weight: 700; letter-spacing: .03em; line-height: 1.3; color: #F3D28C; white-space: nowrap; }
+  .zw-major.b2 { color: #E9CB7E; }
+  .zw-major.b3 { color: #D0B26A; }
+  .zw-major.b4 { color: #A98B56; }
+  .zw-major sup { font-size: clamp(7px, 1.2cqh, 8.5px); color: rgba(243,210,140,.65); margin-left: 1px; font-weight: 400; }
   .zw-major.zw-borrow { opacity: .36; filter: saturate(.4); }
-  .zw-empty { font-size: 10px; font-style: italic; color: rgba(255,255,255,.3); }
-  .zw-borrow-note { font-family: var(--zw-mono); font-size: 8px; color: rgba(255,255,255,.22); margin-top: 1px; }
+  .zw-empty { font-size: clamp(8px, 1.3cqh, 10px); font-style: italic; color: rgba(255,255,255,.3); }
+  .zw-borrow-note { font-family: var(--zw-mono); font-size: clamp(7px, 1.1cqh, 8px); color: rgba(255,255,255,.22); }
 
   .zw-hua {
     font-style: normal;
-    font-size: 8px;
+    font-size: clamp(7px, 1.1cqh, 8px);
     font-weight: 700;
     line-height: 1;
     padding: 2px 4.5px;
@@ -422,14 +464,16 @@
     margin-left: 4px;
     vertical-align: 2px;
   }
-  .h-lu   { color: var(--zw-hua-lu);   border-color: rgba(46,200,176,.45);  background: rgba(46,200,176,.08); }
+  .h-lu   { color: var(--zw-hua-lu);   border-color: rgba(255,255,255,.45); background: rgba(255,255,255,.08); }
   .h-quan { color: var(--zw-hua-quan); border-color: rgba(232,147,62,.45);  background: rgba(232,147,62,.08); }
   .h-ke   { color: var(--zw-hua-ke);   border-color: rgba(126,177,245,.45);background: rgba(126,177,245,.08); }
   .h-ji   { color: var(--zw-hua-ji);   border-color: rgba(240,106,106,.45);background: rgba(240,106,106,.08); }
 
-  .zw-lucky { display: flex; flex-wrap: wrap; gap: 2px 5px; font-size: 9.5px; line-height: 1.5; color: rgba(130,185,245,.6); }
-  .zw-sha   { display: flex; flex-wrap: wrap; gap: 2px 5px; font-size: 9.5px; line-height: 1.5; color: rgba(245,120,120,.58); }
-  .zw-zihua { font-family: var(--zw-mono); font-size: 8.5px; color: rgba(255,255,255,.35); margin-top: auto; }
+  .zw-lucky { display: flex; flex-wrap: wrap; gap: 0 5px; font-size: clamp(9px, 1.55cqh, 11px); line-height: 1.35; color: rgba(140,192,248,.8); }
+  .zw-sha   { display: flex; flex-wrap: wrap; gap: 0 5px; font-size: clamp(9px, 1.55cqh, 11px); line-height: 1.35; color: rgba(248,130,130,.78); }
+  /* 吉星 / 煞星同排一行，省一行高度 */
+  .zw-fortune { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
+  .zw-zihua { font-family: var(--zw-mono); font-size: clamp(8px, 1.25cqh, 9.5px); color: rgba(255,255,255,.48); margin-top: auto; }
 
   /* 中央信息格 */
   .zw-center {
@@ -440,8 +484,8 @@
     justify-content: center;
     gap: 7px;
     padding: 15px 17px;
-    background: rgba(255,255,255,.028);
-    border: 1px solid rgba(255,255,255,.075);
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.14);
     border-radius: 12px;
     animation: zwCellIn .55s cubic-bezier(.2,.8,.2,1) .5s both;
     min-width: 0;
@@ -452,24 +496,31 @@
     align-items: baseline;
     gap: 10px;
     font-family: var(--zw-mono);
-    font-size: 11px;
-    color: rgba(255,255,255,.42);
+    font-size: clamp(10px, 2.5cqh, 12px);
+    color: rgba(255,255,255,.55);
   }
   .zw-kv b { color: rgba(255,255,255,.85); font-weight: 500; letter-spacing: .05em; text-align: right; }
-  .zw-kv.hl b { color: var(--zw-accent); }
+  .zw-kv.hl b { color: rgba(255,255,255,.98); }
+
+  /* ---------- 命盘页：左栏 AI · 右栏十二宫 ---------- */
+  .zw-cols-chart { grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr); align-items: stretch; }
+  .zw-col-ai { min-height: 0; display: flex; flex-direction: column; }
+  .zw-col-chart { min-height: 0; display: flex; flex-direction: column; }
 
   /* ---------- AI 解读 ---------- */
-  .zw-ai { margin-top: 26px; animation: zwCellIn .5s cubic-bezier(.2,.8,.2,1) .68s both; }
+  .zw-ai { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .zw-ai-log {
+    flex: 1;
+    min-height: 0;
     margin-top: 13px;
-    max-height: 340px;
     overflow-y: auto;
-    font-size: 14px;
-    line-height: 2;
+    font-size: 13.5px;
+    line-height: 1.95;
     color: rgba(255,255,255,.85);
     text-shadow: 0 1px 10px rgba(0,0,0,.55);
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,.14) transparent;
+    padding-right: 6px;
   }
   .zw-ai-log::-webkit-scrollbar { width: 5px; }
   .zw-ai-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
@@ -484,21 +535,22 @@
     text-align: center;
   }
   .zw-u-bubble {
-    font-family: var(--zw-mono);
-    font-size: 12.5px;
-    color: var(--zw-accent);
-    letter-spacing: .06em;
-    margin: 16px 0 8px;
+    font-family: var(--zw-sans);
+    font-size: 13px;
+    line-height: 1.7;
+    color: rgba(255,255,255,.94);
+    letter-spacing: .02em;
+    margin: 18px 0 10px;
     padding: 9px 13px;
-    background: rgba(46,200,176,.06);
-    border: 1px solid rgba(46,200,176,.2);
-    border-radius: 11px;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.2);
+    border-left: 2px solid rgba(233,199,124,.6);
+    border-radius: 4px 11px 11px 4px;
     width: fit-content;
     max-width: 100%;
     white-space: pre-wrap;
     word-break: break-word;
   }
-  .zw-u-bubble::before { content: "// 你"; margin-right: 10px; opacity: .55; }
   .zw-a-md { white-space: normal; word-break: break-word; }
   .zw-a-md b { color: rgba(255,255,255,.95); }
   .zw-a-md .md-h {
@@ -510,9 +562,16 @@
     letter-spacing: .04em;
   }
   .zw-a-md .md-li { display: block; padding-left: 10px; }
+  .zw-a-md .md-k {
+    display: inline-block;
+    font-weight: 600;
+    color: rgba(255,255,255,.95);
+    letter-spacing: .14em;
+    margin-right: 9px;
+  }
   .zw-caret::after {
     content: '▍';
-    color: var(--zw-accent);
+    color: rgba(255,255,255,.85);
     animation: zwBlink 1s steps(2, start) infinite;
     margin-left: 1px;
   }
@@ -540,12 +599,12 @@
     outline: none;
     transition: border-color .22s, box-shadow .22s;
   }
-  .zw-ai-bar input:focus { border-color: rgba(46,200,176,.55); box-shadow: 0 0 0 3px rgba(46,200,176,.13); }
+  .zw-ai-bar input:focus { border-color: rgba(255,255,255,.55); box-shadow: 0 0 0 3px rgba(255,255,255,.1); }
   .zw-ai-bar input:disabled { opacity: .4; }
   .zw-ai-bar button {
-    border: 1px solid rgba(46,200,176,.5);
-    color: var(--zw-accent);
-    background: rgba(46,200,176,.07);
+    border: 1px solid rgba(255,255,255,.4);
+    color: rgba(255,255,255,.95);
+    background: rgba(255,255,255,.06);
     border-radius: 11px;
     padding: 0 20px;
     font-size: 13px;
@@ -557,27 +616,128 @@
     transition: transform .3s var(--zw-spring), background .25s;
     white-space: nowrap;
   }
-  .zw-ai-bar button:hover:not(:disabled) { background: rgba(46,200,176,.15); }
+  .zw-ai-bar button:hover:not(:disabled) { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.6); }
   .zw-ai-bar button:active:not(:disabled) { transform: scale(.94); }
   .zw-ai-bar button:disabled { opacity: .4; cursor: default; }
-  .zw-ai-note {
-    margin-top: 12px;
-    font-family: var(--zw-mono);
-    font-size: 10px;
-    letter-spacing: .14em;
-    color: rgba(255,255,255,.25);
+
+  /* 追问快捷问题：手机上少打字 */
+  .zw-ai-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+  .zw-ai-chips[hidden] { display: none; }
+  .zw-ai-chips button {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 999px;
+    color: rgba(255,255,255,.72);
+    padding: 6px 13px;
+    font-size: 12px;
+    font-family: var(--zw-sans);
+    letter-spacing: .04em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .22s, border-color .22s, color .22s, transform .2s var(--zw-spring);
   }
+  .zw-ai-chips button:hover { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.34); color: #fff; }
+  .zw-ai-chips button:active { transform: scale(.95); }
 
   @media (prefers-reduced-motion: reduce) {
     #sky { display: none; }
     .l1, .l2, .zw-entry { animation: none; }
     .zw-cell, .zw-center, .zw-ai { animation: none; }
-    .zw-card { transition: opacity .2s; transform: none; }
-    .zw-overlay.on .zw-card { transform: none; }
+    .zw-panel { transition: opacity .2s; transform: none; }
+    .zw-overlay.on .zw-panel { transform: none; }
     .stage .line, .stage .zw-entry { transition: opacity .2s; }
   }
 
-  /* ---------- 手机端 ---------- */
+  /* ---------- 窄屏 / 手机：整页一起滚，不再锁一屏 ---------- */
+  @media (max-width: 860px) {
+    .zw-overlay {
+      /* 顶部留出关闭按钮，底部避开 iPhone 底部横条 */
+      padding: calc(46px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+               calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      display: block;                  /* 关掉居中 flex，内容自然流式排布 */
+      overflow-y: auto;                /* 滑动时命盘 + 解读 + 输入框整体上移 */
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+    .zw-panel { height: auto; min-height: 100%; }
+    .zw-close { top: calc(14px + env(safe-area-inset-top)); }
+    .zw-cols {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: none;
+      gap: 16px;
+      padding-top: 8px;
+    }
+    .zw-cols-chart {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto auto;
+      gap: 12px;
+    }
+    .zw-cols-chart .zw-col-chart { order: -1; }
+    /* 命盘给定高度，字号靠容器查询单位自动缩放；解读区按内容自然撑开 */
+    .zw-grid { flex: none; height: clamp(300px, 54vh, 430px); }
+    .zw-col-chart, .zw-col-ai, .zw-ai { min-height: 0; flex: none; }
+    .zw-ai-log { overflow: visible; padding-right: 0; }
+    .zw-a-md { scroll-margin-top: 64px; }   /* scrollIntoView 时别顶到关闭按钮下面 */
+    /* 表单页：单列，整体垂直居中 */
+    .zw-cols-form {
+      max-width: none;
+      grid-template-rows: none;
+      align-content: center;
+    }
+    .zw-col-form { justify-content: center; }
+    .zw-title { font-size: clamp(24px, 6.4vw, 32px); }
+    .zw-form { max-width: none; gap: 10px; }
+    .zw-field { gap: 5px; }
+    .zw-input, .zw-select { padding: 8px 11px; font-size: 13px; }
+    .zw-seg button { padding: 7px 18px; font-size: 12.5px; }
+    .zw-go { padding: 10px; font-size: 14px; }
+    .zw-grid { gap: 4px; }
+    .zw-cell { padding: 5px 6px; border-radius: 8px; gap: 1px; }
+    .zw-major { font-size: 11.5px; line-height: 1.3; }
+    .zw-gname { font-size: 10px; }
+    .zw-lucky, .zw-sha { font-size: 8.5px; }
+    .zw-gz, .zw-dx { font-size: 8.5px; }
+    .zw-center { padding: 7px 9px; gap: 3px; }
+    .zw-kv { font-size: 9px; }
+    .zw-head { padding-bottom: 8px; }
+    .zw-title-chart {
+      font-size: 13px !important;
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .zw-ai-log { margin-top: 8px; font-size: 12.5px; line-height: 1.85; }
+    .zw-ai-bar { margin-top: 10px; gap: 6px; }
+    .zw-ai-bar input { padding: 8px 11px; font-size: 12.5px; }
+    .zw-ai-bar button { padding: 0 14px; font-size: 12px; }
+    .zw-ai-hint { font-size: 10.5px; line-height: 1.7; padding: 14px 4px; }
+    .zw-jelly-body { padding: 12px 24px; font-size: 11.5px; letter-spacing: .26em; }
+    .zw-entry-txt { padding-left: .26em; }
+  }
+
+  /* 矮屏手机（如 iPhone SE）：命盘压矮一点，把高度让给解读正文 */
+  @media (max-width: 860px) and (max-height: 700px) {
+    .zw-cols-chart { gap: 8px; }
+    .zw-grid { height: clamp(260px, 48vh, 380px); }
+    .zw-ai-hint { padding: 6px 2px; font-size: 10px; line-height: 1.6; }
+    .zw-ai-log { margin-top: 6px; }
+    .zw-ai-bar { margin-top: 6px; }
+    .zw-head { padding-bottom: 5px; }
+    .zw-cell { padding: 3px 5px; gap: 0; }
+    .zw-gname { font-size: clamp(7.5px, 2.4cqh, 9.5px); }
+    .zw-gz, .zw-dx { font-size: clamp(6.5px, 2cqh, 8px); }
+    .zw-major { font-size: clamp(8px, 2.7cqh, 10.5px); line-height: 1.25; }
+    .zw-major sup { font-size: clamp(5px, 1.6cqh, 6.5px); }
+    .zw-lucky, .zw-sha { font-size: clamp(6.5px, 2.1cqh, 8px); line-height: 1.25; }
+    .zw-empty, .zw-borrow-note { font-size: clamp(6.5px, 2cqh, 8px); }
+    .zw-zihua, .zw-minor { display: none; }   /* 极小屏舍弃次要信息，保证主星完整 */
+    .zw-tag { font-size: 6px; padding: 1px 3px; }
+    .zw-hua { font-size: 6px; padding: 1px 3px; }
+  }
+
+  /* ---------- 手机端首页文字 ---------- */
   @media (max-width: 640px) {
     .block {
       top: 36%;                  /* 小屏略上移，避免重心偏下 */
@@ -591,17 +751,6 @@
       color: rgba(255,255,255,.95);
       white-space: normal;       /* 极窄屏也允许折行，不溢出 */
     }
-    .zw-card { padding-top: 32vh; padding-left: max(20px, env(safe-area-inset-left)); padding-right: 20px; }
-    .zw-grid { gap: 5px; grid-auto-rows: minmax(104px, auto); }
-    .zw-cell { padding: 6px 7px; border-radius: 9px; }
-    .zw-major { font-size: 11.5px; }
-    .zw-lucky, .zw-sha { font-size: 8.5px; }
-    .zw-center { padding: 10px 12px; gap: 5px; }
-    .zw-kv { font-size: 10px; }
-    .zw-form { gap: 14px; }
-    .zw-ai-log { max-height: 300px; font-size: 13.5px; }
-    .zw-jelly-body { padding: 12px 24px; font-size: 11.5px; letter-spacing: .26em; }
-    .zw-entry-txt { padding-left: .26em; }
   }
 
   /* ---------- 平板 ---------- */
@@ -609,11 +758,49 @@
     .line { font-size: clamp(56px, 8vw, 80px); }
   }
 
-  /* 横屏小高度（比如手机横放） */
+  /* 横屏小高度（比如手机横放）：空间实在不够，退化为浮层内滚动 */
   @media (max-height: 480px) and (orientation: landscape) {
     .block { top: 36%; padding-left: max(24px, env(safe-area-inset-left)); }
     .line { font-size: clamp(26px, 5vw, 40px); line-height: 1.2; }
-    .zw-card { padding-top: 18vh; }
+  }
+
+  /* 可用高度极小时（横屏手机 / 4 寸小屏），单屏实在装不下，才允许浮层内滚动 */
+  @media (max-height: 500px) {
+    .zw-overlay { display: block; overflow-y: auto; padding: 46px 16px 16px; }
+    .zw-panel { height: auto; }
+    .zw-cols { grid-template-rows: none; }
+    .zw-grid { min-height: 260px; }
+  }
+
+  /* ---------- 触屏 / 无鼠标设备：按手指的用法调一遍 ---------- */
+  @media (hover: none), (pointer: coarse) {
+    /* iOS 聚焦字号 <16px 的输入框会自动放大整页，而浮层不可滚动、放大后很难退回 */
+    .zw-input, .zw-select, .zw-ai-bar input { font-size: 16px; }
+    .zw-ai-bar input::placeholder { font-size: 14px; }
+
+    /* 手机键盘弹起时浮层收缩到键盘上方（--zw-kb 由 JS 按 visualViewport 写入） */
+    .zw-overlay {
+      height: calc(100% - var(--zw-kb, 0px));
+      transition: opacity .5s ease, visibility .5s, height .22s ease;
+    }
+
+    /* 不要点按灰块、不要双击缩放、不要长按选字 */
+    .zw-entry, .zw-jelly-body, .zw-close, .zw-go, .zw-seg button,
+    .zw-rebtn, .zw-ai-bar button, .zw-check,
+    .zw-input, .zw-select, .zw-ai-bar input {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .zw-cell, .zw-center, .zw-center b, .zw-label { user-select: none; -webkit-user-select: none; }
+
+    /* 快捷问题在手机上放宽一点，手指好点 */
+    .zw-ai-chips { gap: 7px; margin-top: 10px; }
+    .zw-ai-chips button { font-size: 13px; padding: 8px 15px; }
+
+    /* 手机上没有悬停，去掉悬停才有的位移/发光，点按只留按下的回弹 */
+    .zw-go:hover { transform: none; box-shadow: none; }
+    .zw-entry:hover .zw-jelly-body { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.05); }
+    body { overscroll-behavior-y: none; }   /* 别把下拉刷新带出来 */
   }
 </style>
 </head>
@@ -634,11 +821,11 @@
   </div>
 </div>
 
-<!-- 紫微命门浮层：透明无遮罩，星空透出，粒子冻结 -->
+<!-- 紫微命门浮层：透明无遮罩，星空持续流动，全程单屏不滚动 -->
 <div class="zw-overlay" id="zw-overlay" role="dialog" aria-modal="true" aria-label="紫微命门">
-  <div class="zw-card"><div id="zw-body"></div></div>
+  <div class="zw-panel"><div id="zw-body"></div></div>
 </div>
-<button class="zw-close" id="zw-close" type="button">ESC ✕</button>
+<button class="zw-close" id="zw-close" type="button">关闭 ✕</button>
 
 <script src="assets/jelly-button.js" defer></script>
 <script src="assets/ziwei-ui.js" defer></script>
@@ -685,6 +872,13 @@
   let particles = [];
   let raf = 0, running = true, lastT = performance.now();
   const ptr = { x: -1e4, y: -1e4, active: false };
+  /* 触屏没有悬停：粒子不跟手指，改成点按处起一圈扰动，自己慢慢散掉 */
+  const COARSE = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
+  const hasCursor = !COARSE && (window.matchMedia?.('(hover: hover) and (pointer: fine)')?.matches ?? false);
+  const pulses = [];                      /* { x, y, t0 }，最多同时 3 个 */
+  const PULSE_MS = 900;
+  const PULSE_R = 150;
+  const PULSE_K = 2.4;
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   const rnd = x => { const t = 1e4 * Math.sin(x); return t - Math.floor(t); };
@@ -702,8 +896,7 @@
   };
 
   const targetCount = () => {
-    const coarse = window.matchMedia?.('(pointer: coarse)')?.matches;
-    const density = coarse ? CFG.densityCoarse : CFG.densityDesktop;
+    const density = COARSE ? CFG.densityCoarse : CFG.densityDesktop;
     const lo = Math.min(CFG.countMin, CFG.countMax);
     const hi = Math.max(CFG.countMin, CFG.countMax);
     return clamp(Math.floor(W * H / 5e3 * density), lo, hi);
@@ -713,7 +906,8 @@
     const rect = canvas.getBoundingClientRect();
     W = Math.max(1, Math.floor(rect.width));
     H = Math.max(1, Math.floor(rect.height));
-    DPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));   // 上限 2，省填充率
+    /* 触屏按 1.5 倍渲染：肉眼看不出差别，填充率少约 44%，省电发热 */
+    DPR = Math.min(COARSE ? 1.5 : 2, Math.max(1, window.devicePixelRatio || 1));
     canvas.width = Math.floor(W * DPR);
     canvas.height = Math.floor(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -728,6 +922,16 @@
     ptr.active = true;
   };
   const onBlur = () => { ptr.active = false; ptr.x = -1e4; ptr.y = -1e4; };
+
+  /* 触屏点按：在按下的位置记一次扰动，由 frame 里的 pulses 处理 */
+  const onTap = e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+    pulses.push({ x, y, t0: performance.now() });
+    if (pulses.length > 3) pulses.shift();
+  };
 
   const fieldAngle = (x, y, now, seed) =>
     (Math.sin(x * CFG.fieldScaleX + (seed + now) * CFG.timeX) +
@@ -773,6 +977,11 @@
     const segs = [[], [], []];              // 同色合并，每帧只 stroke 3 次
     const step = speed * (dt / 16);
 
+    /* 过期的涟漪先清掉，避免每颗粒子都判断一次 */
+    for (let qi = pulses.length - 1; qi >= 0; qi--) {
+      if (now - pulses[qi].t0 >= PULSE_MS) pulses.splice(qi, 1);
+    }
+
     for (const p of particles) {
       const ox = p.x, oy = p.y;
 
@@ -787,6 +996,21 @@
           const k = (1 - d / R) * CFG.swirl;
           p.vx += -dy / d * k;
           p.vy += dx / d * k;
+        }
+      }
+
+      /* 点按涟漪：切向推力，随时间线性衰减，一圈一圈散开 */
+      if (pulses.length) {
+        for (let qi = 0; qi < pulses.length; qi++) {
+          const q = pulses[qi];
+          const age = (now - q.t0) / PULSE_MS;
+          const dx = ox - q.x, dy = oy - q.y;
+          const d = Math.sqrt(dx * dx + dy * dy) || 1;
+          if (d < PULSE_R) {
+            const k = (1 - d / PULSE_R) * (1 - age) * PULSE_K;
+            p.vx += -dy / d * k;
+            p.vy += dx / d * k;
+          }
         }
       }
 
@@ -822,33 +1046,40 @@
     raf = requestAnimationFrame(frame);
   };
 
-  window.addEventListener('pointermove', onPointer, { passive: true });
-  window.addEventListener('blur', onBlur);
+  /* 只有真正带鼠标的设备才让粒子响应光标；触屏没有悬停，拖动反而会让流场乱跳，
+     所以触屏 / 手写笔设备不挂 pointermove，粒子只靠自身流场一直飘，点按才起涟漪 */
+  if (hasCursor) {
+    window.addEventListener('pointermove', onPointer, { passive: true });
+    window.addEventListener('blur', onBlur);
+  } else {
+    window.addEventListener('pointerdown', onTap, { passive: true });
+  }
+
+  /* 手机键盘弹起时 fixed 浮层不会自己让位：把键盘占掉的高度写成 --zw-kb，
+     CSS 用 height 把浮层收缩到键盘上方，追问输入框就不会被盖住 */
+  if (COARSE && window.visualViewport) {
+    const vv = window.visualViewport;
+    const syncKb = () => {
+      const kb = Math.max(0, Math.min(window.innerHeight * .6,
+        window.innerHeight - vv.height - vv.offsetTop));
+      document.documentElement.style.setProperty('--zw-kb', Math.round(kb) + 'px');
+    };
+    vv.addEventListener('resize', syncKb, { passive: true });
+    vv.addEventListener('scroll', syncKb, { passive: true });
+    syncKb();
+  }
   let rt = 0;
   window.addEventListener('resize', () => {
     clearTimeout(rt);
     rt = setTimeout(resize, 150);
   }, { passive: true });
-  /* 紫微命门开关：冻结/恢复星空（画面保留，回来继续，不跳变） */
-  let frozen = false;
+  /* 页面隐藏时暂停 rAF，回来继续（紫微浮层不影响星空，始终流动） */
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       running = false;
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
-    } else if (!running && !frozen) {
-      running = true;
-      lastT = performance.now();
-      raf = requestAnimationFrame(frame);
-    }
-  });
-  window.addEventListener('ziwei:toggle', e => {
-    frozen = !!e.detail.open;
-    if (frozen) {
-      running = false;
-      if (raf) cancelAnimationFrame(raf);
-      raf = 0;                          /* canvas 保留最后一帧 → 静止星空 */
-    } else if (!document.hidden) {
+    } else if (!running) {
       running = true;
       lastT = performance.now();
       raf = requestAnimationFrame(frame);
